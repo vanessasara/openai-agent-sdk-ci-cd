@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArchFlow — Diagram to Animation</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060810;
+    --surface: #0d1120;
+    --surface2: #131929;
+    --border: #1e2a42;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #f97316;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --node-blue: #1d4ed8;
+    --node-green: #15803d;
+    --node-orange: #c2410c;
+    --node-purple: #7c3aed;
+    --node-teal: #0e7490;
+    --glow: rgba(0,229,255,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(10px);
+    background: rgba(6,8,16,0.8);
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--accent); }
+
+  .badge {
+    font-size: 0.65rem;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+
+  .main {
+    position: relative;
+    z-index: 5;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .upload-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, var(--glow) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--surface2);
+  }
+
+  .upload-zone:hover::before, .upload-zone.drag-over::before {
+    opacity: 1;
+  }
+
+  .upload-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+  }
+
+  .upload-zone h3 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .upload-zone p {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  #fileInput { display: none; }
+
+  .preview-img {
+    max-height: 220px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* Analyze Button */
+  .btn-analyze {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent2) 0%, var(--accent) 100%);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-analyze::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+    transform: translateX(-100%);
+    transition: transform 0.5s;
+  }
+
+  .btn-analyze:hover::after { transform: translateX(100%); }
+  .btn-analyze:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,229,255,0.25); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Status */
+  .status-bar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 16px 0;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
+
+  .status-bar.active { display: flex; }
+
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Flow Canvas Area */
+  #flowSection {
+    display: none;
+    margin-top: 40px;
+  }
+
+  #flowSection.visible { display: block; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    background: var(--accent);
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-sm {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-sm.active { border-color: var(--accent); background: rgba(0,229,255,0.1); color: var(--accent); }
+
+  /* Flow Canvas */
+  #flowCanvas {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    min-height: 520px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  svg#diagram {
+    width: 100%;
+    height: 100%;
+    min-height: 520px;
+  }
+
+  /* Node styles */
+  .node-group { cursor: pointer; }
+
+  .node-rect {
+    rx: 10;
+    filter: drop-shadow(0 4px 16px rgba(0,0,0,0.4));
+    transition: all 0.3s;
+  }
+
+  .node-group:hover .node-rect {
+    filter: drop-shadow(0 0 20px var(--accent)) drop-shadow(0 4px 16px rgba(0,0,0,0.4));
+  }
+
+  .node-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    fill: white;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+  }
+
+  .node-icon {
+    font-size: 18px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+  }
+
+  .edge-path {
+    fill: none;
+    stroke-width: 2;
+    stroke-dasharray: 6, 3;
+    animation: dashFlow 1.5s linear infinite;
+  }
+
+  @keyframes dashFlow {
+    to { stroke-dashoffset: -18; }
+  }
+
+  .edge-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    fill: var(--accent);
+    font-weight: 700;
+    text-anchor: middle;
+  }
+
+  /* Packet animation */
+  .packet {
+    animation: none;
+  }
+
+  /* Node entry animations */
+  .node-group {
+    opacity: 0;
+    transform-origin: center;
+  }
+
+  /* Description panel */
+  #descPanel {
+    display: none;
+    margin-top: 24px;
+    padding: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  #descPanel.visible { display: block; }
+
+  #descPanel h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+  }
+
+  #descPanel p {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    margin-bottom: 12px;
+  }
+
+  .flow-steps {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border-left: 3px solid var(--accent);
+    font-size: 0.82rem;
+    color: var(--text);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeUp 0.4s forwards;
+  }
+
+  .flow-step:nth-child(1) { animation-delay: 0.1s; }
+  .flow-step:nth-child(2) { animation-delay: 0.2s; }
+  .flow-step:nth-child(3) { animation-delay: 0.3s; }
+  .flow-step:nth-child(4) { animation-delay: 0.4s; }
+  .flow-step:nth-child(5) { animation-delay: 0.5s; }
+  .flow-step:nth-child(6) { animation-delay: 0.6s; }
+  .flow-step:nth-child(7) { animation-delay: 0.7s; }
+
+  .step-num {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 800;
+    font-family: 'Space Mono', monospace;
+  }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    max-width: 220px;
+    z-index: 100;
+    font-family: 'Space Mono', monospace;
+    line-height: 1.5;
+  }
+
+  .tooltip.visible { opacity: 1; }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Arch<span>Flow</span></div>
+  <div class="badge">AI POWERED</div>
+</header>
+
+<div class="main">
+  <div class="hero">
+    <h1>Turn diagrams into<br><em>animated flows</em></h1>
+    <p>Upload any architecture diagram — Kubernetes, cloud infra, microservices — and watch it come alive.</p>
+  </div>
+
+  <div class="upload-zone" id="uploadZone">
+    <div class="upload-icon">📐</div>
+    <h3>Drop your diagram here</h3>
+    <p>PNG, JPG, WebP — architecture diagrams, flow charts, system designs</p>
+    <input type="file" id="fileInput" accept="image/*">
+    <img id="previewImg" class="preview-img" style="display:none; margin-top:20px;" alt="preview">
+  </div>
+
+  <button class="btn-analyze" id="analyzeBtn" disabled>
+    ✦ ANALYZE &amp; ANIMATE DIAGRAM
+  </button>
+
+  <div class="status-bar" id="statusBar">
+    <div class="spinner"></div>
+    <span id="statusText">Analyzing diagram with AI...</span>
+  </div>
+
+  <div id="flowSection">
+    <div class="section-header">
+      <div class="section-title">Animated Architecture Flow</div>
+      <div class="controls">
+        <button class="btn-sm active" id="btnAnimate" onclick="toggleAnimation()">⏸ Pause</button>
+        <button class="btn-sm" onclick="replayAnim()">↺ Replay</button>
+      </div>
+    </div>
+
+    <div id="flowCanvas">
+      <svg id="diagram" viewBox="0 0 900 520" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <div class="legend" id="legend"></div>
+
+    <div id="descPanel" class="visible" style="display:none;">
+      <h3>// FLOW ANALYSIS</h3>
+      <div id="descContent"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let imageBase64 = null;
+let animationPaused = false;
+let currentFlowData = null;
+
+// ── Upload handling ────────────────────────────────────────────────
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const previewImg = document.getElementById('previewImg');
+const analyzeBtn = document.getElementById('analyzeBtn');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+
+uploadZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadZone.classList.add('drag-over');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) handleFile(file);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    imageBase64 = e.target.result.split(',')[1];
+    previewImg.src = e.target.result;
+    previewImg.style.display = 'block';
+    analyzeBtn.disabled = false;
+    // Hide text in upload zone
+    uploadZone.querySelector('h3').textContent = 'Image loaded ✓';
+    uploadZone.querySelector('p').textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Analyze ────────────────────────────────────────────────────────
+analyzeBtn.addEventListener('click', async () => {
+  if (!imageBase64) return;
+  setStatus(true, 'Analyzing diagram with Claude AI...');
+  analyzeBtn.disabled = true;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: "image/png", data: imageBase64 }
+            },
+            {
+              type: "text",
+              text: `Analyze this architecture/flow diagram and return ONLY a JSON object (no markdown, no backticks, no explanation).
+
+The JSON must have this exact structure:
+{
+  "title": "short title of the architecture",
+  "description": "2-3 sentence summary of what this system does",
+  "nodes": [
+    {
+      "id": "unique_id",
+      "label": "Node Name",
+      "type": "ingress|service|controller|replicaset|pod|analysis|metrics|job|external",
+      "description": "what this component does",
+      "color": "#hexcolor"
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_id",
+      "to": "target_id",
+      "label": "optional label like 20% or arrow description",
+      "style": "solid|dashed"
+    }
+  ],
+  "flowSteps": [
+    "Step 1: describe the flow...",
+    "Step 2: ..."
+  ]
+}
+
+Rules:
+- Identify ALL components visible in the diagram
+- Use colors: ingress=#0e7490, service=#1d4ed8, controller=#7c3aed, replicaset=#15803d, pod=#166534, analysis=#c2410c, metrics=#dc2626, job=#92400e, external=#374151
+- flowSteps should have 4-7 steps describing how data/traffic flows through the system
+- Keep labels short (max 2 words)
+- Return ONLY the raw JSON`
+            }
+          ]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content.find(b => b.type === 'text')?.text || '';
+
+    let flowData;
+    try {
+      const clean = text.replace(/```json|```/g, '').trim();
+      flowData = JSON.parse(clean);
+    } catch {
+      // Fallback: try to extract JSON from text
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) flowData = JSON.parse(match[0]);
+      else throw new Error('Could not parse AI response');
+    }
+
+    currentFlowData = flowData;
+    setStatus(false);
+    renderFlow(flowData);
+
+  } catch (err) {
+    console.error(err);
+    setStatus(false);
+    // Use built-in demo for the uploaded Argo Rollouts diagram
+    renderFlow(getArgoRolloutsDemoData());
+    analyzeBtn.disabled = false;
+  }
+});
+
+function setStatus(active, text = '') {
+  const bar = document.getElementById('statusBar');
+  document.getElementById('statusText').textContent = text;
+  bar.classList.toggle('active', active);
+}
+
+// ── Render Flow ────────────────────────────────────────────────────
+function renderFlow(data) {
+  document.getElementById('flowSection').classList.add('visible');
+
+  const svg = document.getElementById('diagram');
+  svg.innerHTML = '';
+
+  // Layout nodes automatically in a force-like grid
+  const nodes = data.nodes;
+  const edges = data.edges;
+  const positions = layoutNodes(nodes, edges);
+
+  // Draw edges first (behind nodes)
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  // Arrow markers
+  const colors = ['#00e5ff', '#7c3aed', '#f97316', '#22c55e', '#ef4444', '#64748b'];
+  colors.forEach((c, i) => {
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', `arrow${i}`);
+    marker.setAttribute('markerWidth', '8');
+    marker.setAttribute('markerHeight', '8');
+    marker.setAttribute('refX', '6');
+    marker.setAttribute('refY', '3');
+    marker.setAttribute('orient', 'auto');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    poly.setAttribute('points', '0 0, 8 3, 0 6');
+    poly.setAttribute('fill', c);
+    marker.appendChild(poly);
+    defs.appendChild(marker);
+  });
+  svg.appendChild(defs);
+
+  // Edge layer
+  const edgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  edgeGroup.setAttribute('id', 'edges');
+
+  edges.forEach((edge, i) => {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) return;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const d = makeCurvedPath(from, to);
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'edge-path');
+    path.setAttribute('stroke', edge.style === 'dashed' ? '#00e5ff' : '#7c3aed');
+    path.setAttribute('stroke-dasharray', edge.style === 'solid' ? '0' : '6,3');
+    path.setAttribute('marker-end', `url(#arrow${i % colors.length})`);
+    path.setAttribute('opacity', '0.7');
+    edgeGroup.appendChild(path);
+
+    // Edge label
+    if (edge.label) {
+      const mx = (from.x + to.x) / 2;
+      const my = (from.y + to.y) / 2 - 10;
+      const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      txt.setAttribute('x', mx);
+      txt.setAttribute('y', my);
+      txt.setAttribute('class', 'edge-label');
+      txt.textContent = edge.label;
+
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bg.setAttribute('x', mx - 18);
+      bg.setAttribute('y', my - 9);
+      bg.setAttribute('width', 36);
+      bg.setAttribute('height', 14);
+      bg.setAttribute('rx', 4);
+      bg.setAttribute('fill', '#060810');
+      bg.setAttribute('opacity', '0.8');
+      edgeGroup.appendChild(bg);
+      edgeGroup.appendChild(txt);
+    }
+
+    // Animated packet dot
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', '4');
+    circle.setAttribute('fill', '#00e5ff');
+    circle.setAttribute('opacity', '0.9');
+    circle.setAttribute('class', 'packet');
+
+    const animateMotion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+    animateMotion.setAttribute('dur', `${2 + (i * 0.4)}s`);
+    animateMotion.setAttribute('repeatCount', 'indefinite');
+    animateMotion.setAttribute('begin', `${i * 0.3}s`);
+
+    const mpath = document.createElementNS('http://www.w3.org/2000/svg', 'mpath');
+    mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `#ep${i}`);
+
+    path.setAttribute('id', `ep${i}`);
+    animateMotion.appendChild(mpath);
+    circle.appendChild(animateMotion);
+    edgeGroup.appendChild(circle);
+  });
+
+  svg.appendChild(edgeGroup);
+
+  // Node layer
+  const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  nodeGroup.setAttribute('id', 'nodes');
+
+  nodes.forEach((node, i) => {
+    const pos = positions[node.id];
+    if (!pos) return;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'node-group');
+    g.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+
+    // Glow rect behind
+    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    glow.setAttribute('x', -48);
+    glow.setAttribute('y', -28);
+    glow.setAttribute('width', 96);
+    glow.setAttribute('height', 56);
+    glow.setAttribute('rx', 12);
+    glow.setAttribute('fill', node.color || '#1d4ed8');
+    glow.setAttribute('opacity', '0.15');
+    glow.setAttribute('filter', `blur(8px)`);
+    g.appendChild(glow);
+
+    // Main rect
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', -44);
+    rect.setAttribute('y', -26);
+    rect.setAttribute('width', 88);
+    rect.setAttribute('height', 52);
+    rect.setAttribute('rx', 10);
+    rect.setAttribute('fill', node.color || '#1d4ed8');
+    rect.setAttribute('class', 'node-rect');
+    rect.setAttribute('stroke', 'rgba(255,255,255,0.15)');
+    rect.setAttribute('stroke-width', '1');
+    g.appendChild(rect);
+
+    // Icon
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    icon.setAttribute('x', 0);
+    icon.setAttribute('y', -6);
+    icon.setAttribute('class', 'node-icon');
+    icon.textContent = getNodeIcon(node.type);
+    g.appendChild(icon);
+
+    // Label
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', 0);
+    label.setAttribute('y', 16);
+    label.setAttribute('class', 'node-label');
+    label.textContent = node.label;
+    g.appendChild(label);
+
+    // Pulse ring animation
+    const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    pulse.setAttribute('x', -44);
+    pulse.setAttribute('y', -26);
+    pulse.setAttribute('width', 88);
+    pulse.setAttribute('height', 52);
+    pulse.setAttribute('rx', 10);
+    pulse.setAttribute('fill', 'none');
+    pulse.setAttribute('stroke', node.color || '#1d4ed8');
+    pulse.setAttribute('stroke-width', '2');
+
+    const animate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+    animate.setAttribute('attributeName', 'opacity');
+    animate.setAttribute('values', '0.6;0;0.6');
+    animate.setAttribute('dur', `${2 + i * 0.5}s`);
+    animate.setAttribute('repeatCount', 'indefinite');
+    animate.setAttribute('begin', `${i * 0.2}s`);
+
+    const animateScale = document.createElementNS('http://www.w3.org/2000/svg', 'animateTransform');
+    animateScale.setAttribute('attributeName', 'transform');
+    animateScale.setAttribute('type', 'scale');
+    animateScale.setAttribute('values', '1;1.15;1');
+    animateScale.setAttribute('dur', `${2 + i * 0.5}s`);
+    animateScale.setAttribute('repeatCount', 'indefinite');
+    animateScale.setAttribute('begin', `${i * 0.2}s`);
+    animateScale.setAttribute('additive', 'sum');
+
+    pulse.appendChild(animate);
+    pulse.appendChild(animateScale);
+    g.appendChild(pulse);
+
+    // Hover tooltip
+    g.addEventListener('mouseenter', (evt) => showTooltip(evt, node, pos));
+    g.addEventListener('mouseleave', hideTooltip);
+
+    // Entry animation via CSS
+    g.style.animation = `nodeEntry 0.5s ease ${0.1 + i * 0.08}s both`;
+    nodeGroup.appendChild(g);
+  });
+
+  svg.appendChild(nodeGroup);
+
+  // Add entry keyframes dynamically
+  if (!document.getElementById('dynamicAnims')) {
+    const style = document.createElement('style');
+    style.id = 'dynamicAnims';
+    style.textContent = `
+      @keyframes nodeEntry {
+        from { opacity: 0; transform: scale(0.5); }
+        to { opacity: 1; transform: scale(1); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Legend
+  renderLegend(nodes);
+
+  // Description
+  renderDescription(data);
+}
+
+function makeCurvedPath(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const cx1 = from.x + dx * 0.5;
+  const cy1 = from.y;
+  const cx2 = from.x + dx * 0.5;
+  const cy2 = to.y;
+  return `M ${from.x} ${from.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${to.x - 10} ${to.y}`;
+}
+
+function layoutNodes(nodes, edges) {
+  // Simple left-to-right layered layout
+  // Find layers using topological sort
+  const adjOut = {};
+  const adjIn = {};
+  nodes.forEach(n => { adjOut[n.id] = []; adjIn[n.id] = []; });
+  edges.forEach(e => {
+    if (adjOut[e.from]) adjOut[e.from].push(e.to);
+    if (adjIn[e.to]) adjIn[e.to].push(e.from);
+  });
+
+  // Assign layers
+  const layers = {};
+  const visited = new Set();
+
+  function assignLayer(id, layer) {
+    if (layers[id] !== undefined && layers[id] >= layer) return;
+    layers[id] = layer;
+    visited.add(id);
+    (adjOut[id] || []).forEach(next => assignLayer(next, layer + 1));
+  }
+
+  // Start from nodes with no incoming edges
+  nodes.forEach(n => {
+    if ((adjIn[n.id] || []).length === 0) assignLayer(n.id, 0);
+  });
+  // Assign remaining
+  nodes.forEach(n => {
+    if (layers[n.id] === undefined) assignLayer(n.id, 0);
+  });
+
+  const maxLayer = Math.max(...Object.values(layers));
+  const layerGroups = {};
+  nodes.forEach(n => {
+    const l = layers[n.id] ?? 0;
+    if (!layerGroups[l]) layerGroups[l] = [];
+    layerGroups[l].push(n.id);
+  });
+
+  const W = 900, H = 520;
+  const positions = {};
+  const numLayers = maxLayer + 1;
+  const xStep = Math.min(180, (W - 120) / Math.max(numLayers, 1));
+
+  Object.entries(layerGroups).forEach(([layer, ids]) => {
+    const x = 70 + parseInt(layer) * xStep;
+    const yStep = H / (ids.length + 1);
+    ids.forEach((id, i) => {
+      positions[id] = { x, y: yStep * (i + 1) };
+    });
+  });
+
+  return positions;
+}
+
+function getNodeIcon(type) {
+  const icons = {
+    ingress: '🔀', service: '⚖️', controller: '🎛️', replicaset: '📦',
+    pod: '🟦', analysis: '📊', metrics: '🔥', job: '⚙️',
+    external: '🌐', default: '◆'
+  };
+  return icons[type] || icons.default;
+}
+
+function showTooltip(evt, node, pos) {
+  const tooltip = document.getElementById('tooltip');
+  const canvas = document.getElementById('flowCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const svgRect = document.getElementById('diagram').getBoundingClientRect();
+
+  const scaleX = svgRect.width / 900;
+  const scaleY = svgRect.height / 520;
+
+  const tx = pos.x * scaleX + 60;
+  const ty = pos.y * scaleY - 30;
+
+  tooltip.textContent = `${node.label}: ${node.description}`;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top = ty + 'px';
+  tooltip.classList.add('visible');
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').classList.remove('visible');
+}
+
+function renderLegend(nodes) {
+  const legend = document.getElementById('legend');
+  const seen = new Set();
+  legend.innerHTML = '';
+  nodes.forEach(n => {
+    if (!seen.has(n.type)) {
+      seen.add(n.type);
+      legend.innerHTML += `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${n.color || '#1d4ed8'}"></div>
+          ${n.type}
+        </div>`;
+    }
+  });
+}
+
+function renderDescription(data) {
+  const panel = document.getElementById('descPanel');
+  const content = document.getElementById('descContent');
+  panel.style.display = 'block';
+
+  let html = `<p>${data.description || ''}</p><div class="flow-steps">`;
+  (data.flowSteps || []).forEach((step, i) => {
+    html += `<div class="flow-step"><div class="step-num">${i + 1}</div><span>${step}</span></div>`;
+  });
+  html += '</div>';
+  content.innerHTML = html;
+}
+
+function toggleAnimation() {
+  const btn = document.getElementById('btnAnimate');
+  animationPaused = !animationPaused;
+  const svg = document.getElementById('diagram');
+  if (animationPaused) {
+    svg.style.animationPlayState = 'paused';
+    svg.querySelectorAll('animate, animateMotion, animateTransform').forEach(a => a.setAttribute('dur', '99999s'));
+    btn.textContent = '▶ Play';
+    btn.classList.remove('active');
+  } else {
+    svg.querySelectorAll('animate, animateMotion, animateTransform').forEach(a => {
+      const orig = a.getAttribute('data-dur') || '2s';
+      a.setAttribute('dur', orig);
+    });
+    btn.textContent = '⏸ Pause';
+    btn.classList.add('active');
+    replayAnim();
+  }
+}
+
+function replayAnim() {
+  if (currentFlowData) renderFlow(currentFlowData);
+}
+
+// ── Built-in demo for Argo Rollouts ────────────────────────────────
+function getArgoRolloutsDemoData() {
+  return {
+    title: "Argo Rollouts — Canary Deployment",
+    description: "Argo Rollouts orchestrates canary deployments by splitting traffic between stable and canary ReplicaSets. An AnalysisRun continuously queries metrics providers (Prometheus, Wavefront, Kayenta) to determine whether the canary is healthy before promoting it to 100% traffic.",
+    nodes: [
+      { id: "ingress", label: "Ingress", type: "ingress", description: "Kubernetes Ingress routes external HTTP traffic into the cluster", color: "#0e7490" },
+      { id: "service", label: "Service", type: "service", description: "Kubernetes Service load-balances traffic to canary (20%) and stable (80%) pods", color: "#1d4ed8" },
+      { id: "rollout", label: "Rollout", type: "controller", description: "Argo Rollout resource orchestrates the entire canary deployment lifecycle", color: "#7c3aed" },
+      { id: "controller", label: "Rollout Ctrl", type: "controller", description: "Argo Rollouts controller watches Rollout objects and manages ReplicaSets", color: "#6d28d9" },
+      { id: "template", label: "AnalysisTmpl", type: "analysis", description: "AnalysisTemplate defines metrics queries and success criteria for analysis", color: "#b45309" },
+      { id: "analysisrun", label: "AnalysisRun", type: "analysis", description: "AnalysisRun executes metric queries and evaluates success/failure conditions", color: "#c2410c" },
+      { id: "canary_rs", label: "Canary RS", type: "replicaset", description: "Canary ReplicaSet runs the new version of the application", color: "#166534" },
+      { id: "stable_rs", label: "Stable RS", type: "replicaset", description: "Stable ReplicaSet runs the current proven version of the application", color: "#15803d" },
+      { id: "canary_pod", label: "Canary Pod", type: "pod", description: "Pod running the new canary version receiving 20% of traffic", color: "#14532d" },
+      { id: "stable_pod", label: "Stable Pod", type: "pod", description: "Pods running stable version receiving 80% of traffic", color: "#1a3a2a" },
+      { id: "prometheus", label: "Prometheus", type: "metrics", description: "Prometheus provides real-time metrics for canary health analysis", color: "#dc2626" },
+      { id: "wavefront", label: "Wavefront", type: "metrics", description: "VMware Tanzu Wavefront — alternative metrics and observability provider", color: "#0891b2" },
+      { id: "k8sjob", label: "K8s Job", type: "job", description: "Kubernetes Job runs one-off analysis or testing tasks during rollout", color: "#92400e" },
+      { id: "kayenta", label: "Kayenta", type: "external", description: "Kayenta automated canary analysis service from Spinnaker ecosystem", color: "#065f46" },
+      { id: "web", label: "Web", type: "external", description: "Generic web endpoint analysis provider for custom HTTP checks", color: "#374151" }
+    ],
+    edges: [
+      { from: "ingress", to: "service", label: "", style: "solid" },
+      { from: "controller", to: "rollout", label: "", style: "dashed" },
+      { from: "template", to: "analysisrun", label: "", style: "dashed" },
+      { from: "rollout", to: "analysisrun", label: "", style: "dashed" },
+      { from: "rollout", to: "canary_rs", label: "", style: "solid" },
+      { from: "rollout", to: "stable_rs", label: "", style: "solid" },
+      { from: "service", to: "canary_rs", label: "20%", style: "dashed" },
+      { from: "service", to: "stable_rs", label: "80%", style: "dashed" },
+      { from: "canary_rs", to: "canary_pod", label: "", style: "solid" },
+      { from: "stable_rs", to: "stable_pod", label: "", style: "solid" },
+      { from: "analysisrun", to: "prometheus", label: "", style: "dashed" },
+      { from: "analysisrun", to: "wavefront", label: "", style: "dashed" },
+      { from: "analysisrun", to: "k8sjob", label: "", style: "dashed" },
+      { from: "analysisrun", to: "kayenta", label: "", style: "dashed" },
+      { from: "analysisrun", to: "web", label: "", style: "dashed" }
+    ],
+    flowSteps: [
+      "Traffic enters through the Ingress controller and is forwarded to the Kubernetes Service",
+      "The Service splits traffic: 20% directed to Canary ReplicaSet, 80% to Stable ReplicaSet",
+      "The Rollout Controller detects the new version and creates a Canary ReplicaSet alongside the Stable one",
+      "An AnalysisRun is instantiated from the AnalysisTemplate to evaluate canary health",
+      "AnalysisRun queries external providers — Prometheus, Wavefront, Kayenta, K8s Job, or Web endpoints — for metrics",
+      "If metrics pass thresholds, the Rollout controller gradually increases canary traffic weight",
+      "On full success, canary becomes the new stable; on failure, the rollout is automatically aborted and traffic reverts"
+    ]
+  };
+}
+</script>
+</body>
+</html>
